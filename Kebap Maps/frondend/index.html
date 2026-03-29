@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kebap Maps</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" defer></script>
+
+  <script src="script.js" defer></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+<nav id="navApp">
+  <div class="nav-left">
+    <a href="#home" data-view="home" :class="{ active: currentView === 'home' }">Start</a>
+    <a href="#map" data-view="map" :class="{ active: currentView === 'map' }">Zur Karte</a>
+    <a href="#favorites" data-view="favorites" :class="{ active: currentView === 'favorites' }">Favoriten</a>
+    <a href="#search" data-view="search" :class="{ active: currentView === 'search' }">Suche</a>
+    <a href="#top" data-view="top" :class="{ active: currentView === 'top' }">Empfehlungen</a>
+    <a href="#add" data-view="add" :class="{ active: currentView === 'add' }">Hinzufügen</a>
+    <a href="#review" data-view="review" :class="{ active: currentView === 'review' }">Bewerten</a>
+    <a href="#community" data-view="community" id="navCommunityBtn" :class="{ active: currentView === 'community' }">Community</a>
+    <a href="#about" data-view="about" :class="{ active: currentView === 'about' }">About</a>
+  </div>
+
+  <div class="nav-right">
+  <button id="navAuthBtn" class="nav-btn" type="button" @click.prevent="handleAuthClick">
+    {{ authButtonText }}
+  </button>
+
+  <button
+    id="navSettingsBtn"
+    class="nav-btn nav-settings"
+    :class="{ hidden: !isLoggedIn }"
+    type="button"
+    title="Einstellungen"
+    @click.prevent.stop="handleSettingsClick"
+  >
+    ⚙️
+  </button>
+</div>
+</nav>
+
+<!-- VIEW: HOME -->
+<section id="home" class="view active home-scroll">
+  <div class="hero">
+    <h1>KEBAP MAPS</h1>
+    <p>Der ultimative Pixel-Guide für Berlin</p>
+    <button class="btn" data-view="map" >📍 OPEN MAP</button>
+  </div>
+</section>
+
+<!-- VIEW: MAP -->
+<section id="map" class="view no-scroll">
+  <h2>INTERAKTIVE KARTE</h2>
+  <div class="map-wrapper">
+    <div id="leaflet-map"></div>
+  </div>
+</section>
+
+<!-- Shop Detail View -->
+<section id="shop-detail-view" class="view">
+  <div class="detail-container">
+    <div class="detail-left">
+      <h2 id="detail-shop-name"></h2>
+      <p id="detail-shop-address"></p>
+
+      <h4>Preise</h4>
+      <ul id="detail-shop-prices"></ul>
+
+      <p><strong>Bewertung:</strong> <span id="detail-shop-rating"></span></p>
+      <p><strong>Wartezeit:</strong> <span id="detail-shop-wait"></span></p>
+      <p><strong>Fleisch:</strong> <span id="detail-shop-meat">—</span></p>
+    </div>
+
+    <div class="detail-right">
+      <img id="detail-shop-image" src="src/Download.jpg" alt="Ladenbild" class="shop-image">
+      <a id="detail-route-btn" target="_blank" class="btn route-btn">🧭 Route planen</a>
+    </div>
+
+    <button id="close-detail" class="close-btn" type="button">✖</button>
+
+    <div class="detail-actions-row">
+      <button id="detail-edit-btn" class="btn hidden" type="button">
+        ✏️ Laden bearbeiten
+      </button>
+
+      <button id="detail-delete-btn" class="btn btn-danger hidden" type="button">
+        🗑 Laden löschen
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- VIEW: FAVORITES -->
+<section id="favorites" class="view">
+  <div class="row-actions favorites-toolbar">
+    <label for="favoritesFilter" class="muted favorites-filter-label">Anzeigen:</label>
+    <select id="favoritesFilter" class="btn">
+      <option value="all">Alle Favoriten</option>
+      <option value="community">Nur Community-Merkliste</option>
+    </select>
+  </div>
+
+  <div id="favoritesList"></div>
+</section>
+
+<!-- VIEW: SEARCH -->
+<section id="search" class="view no-scroll">
+  <h2>SUCHE & FILTER</h2>
+
+  <div class="search-controls">
+    <input id="searchInput" placeholder="Name eingeben..." />
+
+    <button class="btn" id="toggleFiltersBtn">⚙ Filter</button>
+    <button class="btn" id="applyFiltersBtn">🔍 Suchen</button>
+    <button class="btn btn-secondary" id="resetFiltersBtn">↩ Zurücksetzen</button>
+
+    <div id="advancedFilters" class="advanced-filters hidden">
+      <label class="chk"><input type="checkbox" id="chickenFilter"> Hähnchen</label>
+      <label class="chk"><input type="checkbox" id="steakFilter"> Steakqualität</label>
+      <label class="chk"><input type="checkbox" id="hackFilter"> Hackspieß</label>
+
+      <label class="min-rating">
+        Bewertung:
+        <select id="minRatingFilter">
+          <option value="">egal</option>
+          <option value="lt2">unter 2</option>
+          <option value="2to3">2 - 3</option>
+          <option value="3to4">3 - 4</option>
+          <option value="4to5">4 - 5</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="results-panel">
+    <div class="results-grid" id="searchResults"></div>
+  </div>
+</section>
+
+<!-- VIEW: TOP -->
+<section id="top" class="view">
+  <h2>TOP DÖNER</h2>
+
+  <div class="top-grid" id="topGrid"></div>
+  <p id="topEmptyHint" class="hidden">Noch keine Bewertungen vorhanden.</p>
+
+</section>
+
+<!-- VIEW: ADD -->
+<section id="add" class="view">
+  <h2>DÖNERLADEN HINZUFÜGEN</h2>
+
+  <div class="rate-card">
+    <div class="rate-grid">
+      <label class="rate-field">
+        <span>Name des Dönerladens</span>
+        <input id="rateName" placeholder="z.B. Rüyam Gemüse Kebap" />
+      </label>
+
+      <label class="rate-field">
+        <span>Adresse</span>
+
+        <div class="address-autocomplete">
+          <input id="rateAddress" placeholder="Straße Hausnr, PLZ Berlin" autocomplete="off" />
+          <ul id="addressSuggestions" class="suggestions hidden"></ul>
+
+          <input type="hidden" id="rateLat" />
+          <input type="hidden" id="rateLng" />
+        </div>
+      </label>
+
+      <label class="rate-field">
+        <span>Wartezeit</span>
+        <input id="rateWait" placeholder="z.B. 10–15 min" />
+      </label>
+
+      <label class="rate-field">
+        <span>Fleischart</span>
+        <select id="meatType">
+          <option value="">Bitte auswählen…</option>
+          <option value="chicken">Hähnchen</option>
+          <option value="steak">Steakqualität</option>
+          <option value="hack">Hackspieß</option>
+        </select>
+      </label>
+
+      <label class="rate-field rate-prices">
+        <span>Preise (eine Zeile pro Eintrag)</span>
+        <textarea id="ratePrices" rows="5" placeholder="Döner: 8,00 €&#10;Dürüm: 8,50 €"></textarea>
+      </label>
+
+      <div class="rate-field">
+        <span>Bewertung</span>
+
+        <div class="stars-wrap">
+          <div class="stars-base">★★★★★</div>
+          <div class="stars-fill" id="starsFill">★★★★★</div>
+        </div>
+
+        <input id="ratingRange" type="range" min="0.5" max="5" step="0.5" value="0.5" />
+        <div class="rating-value">
+          <span id="ratingValue">4.5</span> / 5
+        </div>
+
+        <p class="rate-hint">0,5er Schritte möglich</p>
+      </div>
+    </div>
+
+    <div class="rate-actions">
+      <button class="btn" id="rateSubmitBtn">➕ Dönerladen hinzufügen</button>
+      <p id="rateMsg" class="rate-msg"></p>
+    </div>
+  </div>
+</section>
+
+<!-- VIEW: REVIEW -->
+<section id="review" class="view">
+  <h2>BEWERTEN</h2>
+
+  <div class="pixel-card">
+    <p>Hier kannst du Läden bewerten. Bereits bewertete Läden werden getrennt angezeigt.</p>
+  </div>
+
+  <h3 class="section-subtitle">Noch nicht bewertet</h3>
+  <div id="reviewUnratedList" class="results-grid"></div>
+
+  <h3 class="section-subtitle">Schon bewertet</h3>
+  <div id="reviewRatedList" class="results-grid"></div>
+</section>
+
+<!-- VIEW: COMMUNITY -->
+<section class="view" id="community">
+  <h2>Andere haben diese Läden besucht</h2>
+
+  <p class="muted">
+    Hier siehst du Läden, die von anderen Usern bewertet wurden. Du kannst sie merken (★),
+    Bewertungen ansehen, Route planen oder zu deinen eigenen Läden hinzufügen.
+  </p>
+
+  <div id="communityList"></div>
+</section>
+
+<!-- VIEW: ABOUT -->
+<section id="about" class="view home-scroll">
+  <h2>ABOUT</h2>
+
+  <div class="pixel-card">
+    <p><strong>Kebap Maps</strong> ist eine SPA zur Entdeckung Berliner Dönerläden.</p>
+    <p>Vue 3 · HTML · CSS · JavaScript · Leaflet · Express</p>
+  </div>
+
+  <h2 class="team-title">DAS TEAM</h2>
+
+  <div class="team-grid">
+    <div class="flip-card" tabindex="0" role="button" aria-label="Studentenkarte umdrehen">
+      <div class="flip-card-inner">
+        <div class="flip-card-front">
+          <h3>Johannes</h3>
+          <p>Frontend</p>
+          <br>
+          <p class="press-here">--hier klicken--</p>
+        </div>
+        <div class="flip-card-back">
+          <p>Pixel-UI</p>
+          <p>Aufbau der SPA</p>
+          <p>Retro-Design</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flip-card" tabindex="0" role="button" aria-label="Studentenkarte umdrehen">
+      <div class="flip-card-inner">
+        <div class="flip-card-front">
+          <h3>Damian</h3>
+          <p>Backend</p>
+          <br>
+          <p class="press-here">--hier klicken--</p>
+        </div>
+        <div class="flip-card-back">
+          <p>Server</p>
+          <p>Datenbanken</p>
+          <p>API</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flip-card" tabindex="0" role="button" aria-label="Studentenkarte umdrehen">
+      <div class="flip-card-inner">
+        <div class="flip-card-front">
+          <h3>Ali</h3>
+          <p>Allrounder</p>
+          <p>🪦</p>
+          <br>
+          <p class="press-here">--hier klicken--</p>
+        </div>
+        <div class="flip-card-back">
+          <p>Tests</p>
+          <p>Frontend/Backend</p>
+          <p>Recherchen</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>© 2026 Kebap Maps Berlin</p>
+</footer>
+
+<!-- Confirm Modal (Pixel Style) -->
+<div id="confirmModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <h3 class="modal-title">Laden löschen?</h3>
+    <p id="confirmModalText" class="modal-text">Willst du diesen Laden wirklich löschen?</p>
+
+    <div class="modal-actions">
+      <button id="confirmCancelBtn" class="btn btn-secondary" type="button">Abbrechen</button>
+      <button id="confirmOkBtn" class="btn btn-danger" type="button">Ja, löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rate Modal -->
+<div id="rateModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <h3 class="modal-title">Bewertung abgeben</h3>
+    <p id="rateModalShopName" class="modal-text">Shop</p>
+
+    <div class="rate-modal-stars">
+      <div class="stars-wrap">
+        <div class="stars-base">★★★★★</div>
+        <div class="stars-fill" id="userStarsFill">★★★★★</div>
+      </div>
+
+      <input id="userRateRange" type="range" min="0.5" max="5" step="0.5" value="4.5" />
+      <div class="rating-value">
+        <span id="userRateValue">4.5</span> / 5
+      </div>
+    </div>
+
+    <input type="hidden" id="rateModalShopId" />
+
+    <div class="modal-actions">
+      <button id="rateModalCancel" class="btn btn-secondary" type="button">Abbrechen</button>
+      <button id="rateModalSubmit" class="btn" type="button">Speichern</button>
+    </div>
+
+    <p id="rateModalMsg" class="rate-msg"></p>
+  </div>
+</div>
+
+<!-- Edit Shop Modal -->
+<div id="editShopModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card edit-shop-shell" role="dialog" aria-modal="true">
+    <h3 class="modal-title">Laden bearbeiten</h3>
+
+    <div class="rate-card">
+      <div class="rate-grid">
+        <input type="hidden" id="editShopId" />
+
+        <label class="rate-field">
+          <span>Adresse</span>
+
+          <div class="address-autocomplete">
+            <input id="editAddress" placeholder="Straße Hausnr, PLZ Berlin" autocomplete="off" />
+            <ul id="editAddressSuggestions" class="suggestions hidden"></ul>
+
+            <input type="hidden" id="editLat" />
+            <input type="hidden" id="editLng" />
+          </div>
+        </label>
+
+        <label class="rate-field">
+          <span>Wartezeit</span>
+          <input id="editWait" placeholder="z.B. 10–15 min" />
+        </label>
+
+        <label class="rate-field rate-prices">
+          <span>Preise (eine Zeile pro Eintrag)</span>
+          <textarea id="editPrices" rows="5" placeholder="Döner: 8,00 €&#10;Dürüm: 8,50 €"></textarea>
+        </label>
+      </div>
+
+      <div class="rate-actions">
+        <button class="btn btn-secondary" id="editShopCancelBtn" type="button">Abbrechen</button>
+        <button class="btn" id="editShopSaveBtn" type="button">Speichern</button>
+        <p id="editShopMsg" class="rate-msg"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div id="authModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <h3 class="modal-title">Account</h3>
+
+    <div class="auth-tabs">
+      <button id="authTabLogin" class="btn btn-secondary auth-tab active" type="button">Anmelden</button>
+      <button id="authTabRegister" class="btn btn-secondary auth-tab" type="button">Registrieren</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="authLoginPane" class="auth-pane">
+      <label class="rate-field">
+        <span>Username</span>
+        <input id="loginInput" placeholder="z.B. Max" />
+      </label>
+
+      <label class="rate-field">
+        <span>Passwort</span>
+        <input id="loginPassword" type="password" placeholder="••••••••" />
+      </label>
+
+      <div class="modal-actions">
+        <button id="authCancelBtn" class="btn btn-secondary" type="button">Abbrechen</button>
+        <button id="authLoginBtn" class="btn" type="button">Login</button>
+      </div>
+
+      <p id="authMsg" class="rate-msg"></p>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="authRegisterPane" class="auth-pane hidden">
+      <label class="rate-field">
+        <span>Username</span>
+        <input id="regUsername" placeholder="mind. 3 Zeichen" />
+      </label>
+
+      <label class="rate-field">
+        <span>Passwort</span>
+        <input id="regPassword" type="password" placeholder="mind. 6 Zeichen" />
+      </label>
+
+      <div class="modal-actions">
+        <button id="authCancelBtn2" class="btn btn-secondary" type="button">Abbrechen</button>
+        <button id="authRegisterBtn" class="btn" type="button">Abschließen</button>
+      </div>
+
+      <p id="authMsg2" class="rate-msg"></p>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card settings-shell" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-left">
+      <div class="settings-title">
+        <div class="settings-title-top">
+          <span class="settings-gear">⚙</span>
+          <span id="settingsTitle">Einstellungen</span>
+        </div>
+        <div class="settings-userline">
+          Eingeloggt als: <b id="settingsUsername">—</b>
+        </div>
+      </div>
+
+      <nav class="settings-nav">
+        <button class="settings-nav-item active" data-settings-tab="account" type="button">Account</button>
+        <button class="settings-nav-item" data-settings-tab="privacy" type="button">Privatsphäre</button>
+        <button class="settings-nav-item" data-settings-tab="app" type="button">App</button>  
+      </nav>
+
+      <div class="settings-footer">
+        <button id="logoutBtn" class="btn btn-danger" type="button">Logout</button>
+        <button id="settingsCloseBtn" class="btn" type="button">Schließen</button>
+      </div>
+    </div>
+
+    <div class="settings-right">
+      <!-- ACCOUNT -->
+      <section class="settings-pane" data-settings-pane="account">
+        <h3 class="settings-h">Account</h3>
+
+        <div class="settings-card">
+          <h4 class="settings-subh">Passwort ändern</h4>
+          <p class="settings-muted">Aus Sicherheitsgründen wirst du danach ausgeloggt.</p>
+
+          <div class="settings-grid">
+            <label class="settings-label">
+              Altes Passwort
+              <input id="pwOld" type="password" class="input" autocomplete="current-password" />
+            </label>
+
+            <label class="settings-label">
+              Neues Passwort
+              <input id="pwNew" type="password" class="input" autocomplete="new-password" />
+            </label>
+
+            <label class="settings-label">
+              Neues Passwort wiederholen
+              <input id="pwNew2" type="password" class="input" autocomplete="new-password" />
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="pwChangeBtn" class="btn">Passwort speichern</button>
+            <span id="pwMsg" class="settings-msg"></span>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h4 class="settings-subh">Account löschen</h4>
+          <p class="settings-muted">
+            Löscht deinen Account dauerhaft inklusive Favoriten, Bewertungen und deiner erstellten Läden.
+            Diese Aktion kann nicht rückgängig gemacht werden.
+          </p>
+
+          <div class="settings-grid">
+            <label class="settings-label">
+              Passwort bestätigen zum löschen
+              <input id="deleteAccountPw" type="password" class="input" autocomplete="current-password" />
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="deleteAccountBtn" class="btn btn-danger" type="button">Account löschen</button>
+            <span id="deleteAccountMsg" class="settings-msg"></span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- PRIVACY -->
+      <section class="settings-pane hidden" data-settings-pane="privacy">
+        <h3 class="settings-h">Privatsphäre</h3>
+
+        <div class="settings-card">
+          <h4 class="settings-subh">Lokale Daten</h4>
+          <p class="settings-muted">
+            Diese App speichert kleine Einstellungen und deine lokalen Anzeigen (z.B. UI). Du kannst das zurücksetzen.
+          </p>
+
+          <div class="settings-actions">
+            <button id="clearLocalBtn" class="btn">Lokale Daten löschen</button>
+            <span id="clearLocalMsg" class="settings-msg"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- APP -->
+      <section class="settings-pane hidden" data-settings-pane="app">
+        <h3 class="settings-h">App</h3>
+
+        <div class="settings-card">
+          <h4 class="settings-subh">Darstellung</h4>
+
+          <div class="settings-grid">
+            <label class="settings-label">
+              Community: bereits hinzugefügte Shops ausblenden
+              <select id="communityHideAdded" class="input">
+                <option value="0">Nein</option>
+                <option value="1">Ja</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="saveSettingsBtn" class="btn">Einstellungen speichern</button>
+            <span id="appSettingsMsg" class="settings-msg"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITY MODAL -->
+<div id="communityRatingsModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <h3 id="communityRatingsTitle">Bewertungen</h3>
+    <div id="communityRatingsBody"></div>
+
+    <div class="row-actions">
+      <button class="btn" id="communityRatingsCloseBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITY MODAL 2 -->
+<div id="infoModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card">
+    <h3 id="infoModalTitle">Info</h3>
+
+    <p id="infoModalText"></p>
+
+    <div class="row-actions">
+      <button class="btn" id="infoModalOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAVORITES MODAL -->
+<div id="cloneChoiceModal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card">
+    <h3 id="cloneChoiceTitle">Laden hinzufügen</h3>
+    <p id="cloneChoiceText">Wie möchtest du fortfahren?</p>
+
+    <div class="row-actions">
+      <button class="btn" id="cloneOnlyBtn">Nur hinzufügen</button>
+      <button class="btn" id="cloneAndFavBtn">Hinzufügen & als Favorit speichern</button>
+      <button class="btn" id="cloneChoiceCancelBtn">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
